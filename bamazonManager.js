@@ -5,7 +5,7 @@ var connection = mysql.createConnection({
 	port: 3306,
 	user: 'root',
 	password: 'root',
-	database: 'Bamazon_db'
+	database: 'bamazon_db'
 });
 
 //Establish Connection - Call the Manager Input function
@@ -28,15 +28,15 @@ function managerInput(){
 		choices: ['1) View Products for sale', '2) View low inventory', '3) Add to inventory', '4) Add new product']
 	}]).then(function(answer){
 		if(answer.input === '1) View Products for sale'){
-			connection.query('SELECT * FROM products', function(err, res){
+			connection.query('SELECT * FROM StoreProducts', function(err, res){
 			if (err) throw err;
 			console.log('');
 			console.log('========================ITEMS IN STORE=======================');
 			for(i=0;i<res.length;i++){
-				console.log('Item ID:' + res[i].id);
-				console.log('Product Name: ' + res[i].ProductName);
+				console.log('Item ID:' + res[i].Item_id);
+				console.log('Product Name: ' + res[i].Item_Name);
 				console.log('Price: ' + '$' + res[i].Price);
-				console.log('Quantity in Stock: ' + res[i].StockQuantity);
+				console.log('Quantity in Stock: ' + res[i].Stock_Quantity);
 				console.log('---------------------');
 			}
 			console.log('')
@@ -44,14 +44,14 @@ function managerInput(){
 			})
 		}
 		else if(answer.input === '2) View low inventory'){
-			connection.query('SELECT * FROM products WHERE StockQuantity < 5', function(err, res){
+			connection.query('SELECT * FROM StoreProducts WHERE Stock_Quantity < 15', function(err, res){
 				if (err) throw err;
 				console.log('')
 				console.log('========================LOW INVENTORY=======================');
 				for(i=0;i<res.length;i++){
-					console.log('Name: ' + res[i].ProductName);
-					console.log('Product ID: ' + res[i].id);
-					console.log('Quantity in Stock: ' + res[i].StockQuantity);
+					console.log('Name: ' + res[i].Item_Name);
+					console.log('Product ID: ' + res[i].Item_id);
+					console.log('Quantity in Stock: ' + res[i].Stock_Quantity);
 					console.log('---------------------');
 				}
 				newTransaction();
@@ -79,9 +79,9 @@ function managerInput(){
 						return 'Please enter a numerical value'
 					}
 			}]).then(function(answer){
-				connection.query('SELECT * FROM products WHERE id = ?', [answer.item], function(err, res){
-						connection.query('UPDATE products SET ? Where ?', [{
-							StockQuantity: res[0].StockQuantity + parseInt(answer.number)
+				connection.query('SELECT * FROM StoreProducts WHERE Item_id = ?', [answer.item], function(err, res){
+						connection.query('UPDATE StoreProducts SET ? Where ?', [{
+							Stock_Quantity: res[0].Stock_Quantity + parseInt(answer.number)
 						},{
 							id: answer.item
 						}], function(err, res){});
@@ -118,11 +118,11 @@ function managerInput(){
 						return 'Please enter a numerical value'
 					}
 			}]).then(function(answer){
-				connection.query('INSERT into products SET ?', {
+				connection.query('INSERT into StoreProducts SET ?', {
 					ProductName: answer.product,
 					DepartmentName: answer.department,
 					Price: answer.price,
-					StockQuantity: answer.stock
+					Stock_Quantity: answer.stock
 				}, function(err, res){});
 				console.log('Product Added');
 				newTransaction();

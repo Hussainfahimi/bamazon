@@ -1,125 +1,113 @@
-var inquirer = require('inquirer');
-var mysql = require('mysql');
+var mysql = require("mysql");
+var inquirer = require("inquirer");
 
-var amountOwed;
-var currentDepartment;
-var updateSales;
+var Stock_Quantity;
+var Item_id;
+var chosenItem;
 
 var connection = mysql.createConnection({
-	host: 'localhost',
-	port: 3306,
-	user: 'root',
-	password: 'root',
-	database: 'Bamazon_db'
+    host: "localhost",
+    port: 3306,
+    user: "root",
+    password: "root",
+    database: "bamazon_db"
 });
 
-//Establish Connection
-connection.connect(function(err){
-	if (err) throw err;
-	console.log('connected as id: ' + connection.threadId)
+
+
+connection.connect(function (err) {
+    if (err) {
+        throw err;
+    }
+    displayProducts();
+
 });
 
-//FUNCTIONS
-//=============================================================================
+///function to display items availble in store
 
-//Displays all items available in store and then calls the place order function
-function showProducts(){
-	connection.query('SELECT * FROM products', function(err, res){
-		if (err) throw err;
-		
+function displayProducts() {
+    console.log("Selecting all product availble in store..\n");
+    var sql = "SELECT Item_id, Item_Name, Dep_id, Price, Stock_Quantity FROM StoreProducts";
+    connection.query(sql, function (err, res) {
+        if (err) throw err;
 
-		for(i=0;i<res.length;i++){
-			console.log('Item ID:' + res[i].id + ' Product Name: ' + res[i].ProductName + ' Price: ' + '$' + res[i].Price + '(Quantity left: ' + res[i].StockQuantity + ')')
-		}
-		console.log('=================================================');
-		placeOrder();
-		})
+
+        for (var i = 0; i < res.length; i++) {
+            console.log(`Item ID: ${res[i].Item_id}
+                        Product Name: ${res[i].Item_Name} 
+                        Department id: ${res[i].Dep_id}
+                        Price: ${res[i].Price}
+                        Quantity: ${res[i].Stock_Quantity}
+
+            `);
+        }
+        orderProduct();
+
+    });
+
 }
 
-//Prompts the user to place an order, fulfills the order, and then calls the new order function
-function placeOrder(){
-	inquirer.prompt([{
-		name: 'selectId',
-		message: 'Please enter the ID of the product you wish to purchase',
-		validate: function(value){
-			var valid = value.match(/^[0-9]+$/)
-			if(valid){
-				return true
-			}
-				return 'Please enter a valid Product ID'
-		}
-	},{
-		name:'selectQuantity',
-		message: 'How many of this product would you like to order?',
-		validate: function(value){
-			var valid = value.match(/^[0-9]+$/)
-			if(valid){
-				return true
-			}
-				return 'Please enter a numerical value'
-		}
-	}]).then(function(answer){
-	connection.query('SELECT * FROM products WHERE id = ?', [answer.selectId], function(err, res){
-		if(answer.selectQuantity > res[0].StockQuantity){
-			console.log('Insufficient Quantity');
-			console.log('This order has been cancelled');
-			console.log('');
-			newOrder();
-		}
-		else{
-			amountOwed = res[0].Price * answer.selectQuantity;
-			currentDepartment = res[0].DepartmentName;
-			console.log('Thanks for your order');
-			console.log('You owe $' + amountOwed);
-			console.log('');
-			//update products table
-			connection.query('UPDATE products SET ? Where ?', [{
-				StockQuantity: res[0].StockQuantity - answer.selectQuantity
-			},{
-				id: answer.selectId
-			}], function(err, res){});
-			//update departments table
-			logSaleToDepartment();
-			newOrder();
-		}
-	})
+//Fuction for the user to place an order
 
-}, function(err, res){})
-};
+function orderProduct() {
+    inquirer.prompt({
+        name: "choice",
+        type: "input",
+        message: "Please enter the product id which you want to buy"
+    })
+        .then(function (answer) {
+            connection.query(
+                "SELECT * FROM StoreProducts WHERE ?",
+                { Item_id: answer.choice },
+                function (err, res) {
+                    chosenItem = res[0];
+                    var stock_quantity = res[0].Stock_Quantity;
+                    purchaseItem(chosenItem);
+                }
+            );
 
-//Allows the user to place a new order or end the connection
-function newOrder(){
-	inquirer.prompt([{
-		type: 'confirm',
-		name: 'choice',
-		message: 'Would you like to place another order?'
-	}]).then(function(answer){
-		if(answer.choice){
-			placeOrder();
-		}
-		else{
-			console.log('Thank you for shopping at Bamazon!');
-			connection.end();
-		}
-	})
-};
+        });
+}
 
+function purchaseItem(chosenItem) {
+    inquirer.prompt({
+        name: "userPurchase",
+        type: "input",
+        message: "How many of this product do you need?"
+    })
+        .then(function (answer) {
+            if (chosenItem.Stock_Quantity < answer.userPurchae) {
+                console.log(
+                    "Insufficient quantity. We only have " + chosenItem.Stock_Quantity + "Of this!"
+                );
+                purchaseItem(chosenItem);
+            } else {
+                //console.log(chosenItem.Stock_Quantity, answer.userPurchase);
+                var updateSQ = parseInt(chosenItem.Stock_Quantity) - parseInt(answer.userPurchase);
+                var salePrice = parseFloat(chosenItem.Price) * parseInt(answer.userPurchase);
 
-//functions to push the sales to the executive table
-function logSaleToDepartment(){
-	connection.query('SELECT * FROM departments WHERE DepartmentName = ?', [currentDepartment], function(err, res){
-		updateSales = res[0].TotalSales + amountOwed;
-		updateDepartmentTable();
-	})
-};
+                //console.log(updateSQ, salePrice);
+                console.log("Your order is almost complete \nTotal cost will be " + salePrice);
+                 updateDatabase(updateSQ);
+            }
+        });
+}
 
-function updateDepartmentTable(){
-		connection.query('UPDATE departments SET ? WHERE ?', [{
-		TotalSales: updateSales
-	},{
-		DepartmentName: currentDepartment
-	}], function(err, res){});
-};
-//Call the original function (all other functions are called within this function)
-//======================================================================
-showProducts();
+function updateDatabase(updateSQ) {
+    connection.query(
+        "UPDATE StoreProducts SET ? WHERE ?",
+        [
+            {
+                Stock_Quantity: updateSQ
+            },
+            {
+                Item_id: chosenItem.Item_id
+            }
+        ],
+        function (err) {
+            if (err) throw err;
+            console.log("Congratulation your purchase was successfull")
+            connection.end();
+        }
+    );
+}
